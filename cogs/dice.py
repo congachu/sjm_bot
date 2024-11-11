@@ -17,7 +17,7 @@ class Dice(commands.Cog):
             self.bot.cursor.execute("INSERT INTO users (uuid) VALUES (%s)", (user_id,))
             self.bot.conn.commit()
 
-    @app_commands.command(name="홀짝", description="주사위 눈금으로 승부가 결정납니다.\n승리시 1.75배, 패배시 0.5배")
+    @app_commands.command(name="홀짝", description="주사위 눈금으로 승부가 결정납니다.\n승리시 1.75배, 패배시 0배")
     @app_commands.choices(choice=[
         app_commands.Choice(name="홀", value="odd"),
         app_commands.Choice(name="짝", value="even")
@@ -52,7 +52,7 @@ class Dice(commands.Cog):
                                     (winnings, user_id))  # 추가 수익만 더함
             result_msg = f"승리! {winnings}원을 얻었습니다."
         else:
-            # 패배 (0.5배 = 50% 손실)
+            # 패배 (0배 = 전부 손실)
             loss = int(amount)  # 잃을 금액 계산
             self.bot.cursor.execute("UPDATE users SET money = money - %s WHERE uuid = %s",
                                     (loss, user_id))  # 손실금액을 뺌
