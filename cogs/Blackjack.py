@@ -192,7 +192,7 @@ class Blackjack(commands.Cog):
                     winnings = int(amount * 1.5)  # 원금 포함 2.5배
             elif dealer_blackjack:
                 result = "패배 (딜러 블랙잭)"
-                winnings = -amount
+                winnings = -int(amount * 1.5)
             elif dealer_total > 21:
                 result = "승리"
                 winnings = amount
