@@ -64,6 +64,17 @@ class Blackjack(commands.Cog):
 
         return total
 
+    def is_blackjack(self, hand):
+        # 카드가 정확히 2장이고, 합이 21인 경우만 블랙잭으로 인정
+        if len(hand) != 2:
+            return False
+
+        # Ace와 10점 카드(10,J,Q,K)가 있는지 확인
+        has_ace = any(card.value == 1 for card in hand)
+        has_ten = any(card.value >= 10 for card in hand)
+
+        return has_ace and has_ten
+
     @app_commands.command(name="블랙잭", description="블랙잭 게임을 시작합니다.\n승리시 2배, 무승부시 1배, 패배시 0배")
     async def blackjack(self, interaction: discord.Interaction, amount: int):
         user_id = interaction.user.id
@@ -158,19 +169,31 @@ class Blackjack(commands.Cog):
 
     async def end_game(self, interaction, user_id, reason):
         game = self.games[user_id]
-        player_total = self.calculate_hand(game['player_hand'])
-        dealer_total = self.calculate_hand(game['dealer_hand'])
+        player_hand = game['player_hand']
+        dealer_hand = game['dealer_hand']
+        player_total = self.calculate_hand(player_hand)
+        dealer_total = self.calculate_hand(dealer_hand)
         amount = game['amount']
-
-        dealer_cards = " ".join(str(card) for card in game['dealer_hand'])
-        player_cards = " ".join(str(card) for card in game['player_hand'])
 
         # 결과 계산
         if reason == "bust":
             result = "패배"
             winnings = -amount
         else:
-            if dealer_total > 21:
+            player_blackjack = self.is_blackjack(player_hand)
+            dealer_blackjack = self.is_blackjack(dealer_hand)
+
+            if player_blackjack:
+                if dealer_blackjack:
+                    result = "무승부 (블랙잭)"
+                    winnings = 0
+                else:
+                    result = "블랙잭!"
+                    winnings = int(amount * 1.5)  # 원금 포함 2.5배
+            elif dealer_blackjack:
+                result = "패배 (딜러 블랙잭)"
+                winnings = -amount
+            elif dealer_total > 21:
                 result = "승리"
                 winnings = amount
             elif player_total > dealer_total:
@@ -192,14 +215,26 @@ class Blackjack(commands.Cog):
         self.bot.cursor.execute("SELECT money FROM users WHERE uuid = %s", (user_id,))
         new_balance = self.bot.cursor.fetchone()[0]
 
+        dealer_cards = " ".join(str(card) for card in dealer_hand)
+        player_cards = " ".join(str(card) for card in player_hand)
+
         # 결과 메시지 전송
+        msg = f"게임 종료!\n" \
+              f"딜러의 패: {dealer_cards} (총합: {dealer_total})\n" \
+              f"당신의 패: {player_cards} (총합: {player_total})\n" \
+              f"결과: {result}\n"
+
+        if winnings > 0:
+            msg += f"획득: +{winnings}원\n"
+        elif winnings < 0:
+            msg += f"손실: {winnings}원\n"
+        else:
+            msg += "금액 변동 없음\n"
+
+        msg += f"현재 잔액: {new_balance}원"
+
         await interaction.response.edit_message(
-            content=f"게임 종료!\n"
-                    f"딜러의 패: {dealer_cards} (총합: {dealer_total})\n"
-                    f"당신의 패: {player_cards} (총합: {player_total})\n"
-                    f"결과: {result}\n"
-                    f"변동: {winnings:+}원\n"
-                    f"현재 잔액: {new_balance}원",
+            content=msg,
             view=None
         )
 
