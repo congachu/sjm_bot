@@ -78,6 +78,14 @@ class Blackjack(commands.Cog):
     @app_commands.command(name="블랙잭", description="블랙잭 게임을 시작합니다.\n승리시 2배, 무승부시 1배, 패배시 0배")
     async def blackjack(self, interaction: discord.Interaction, amount: int):
         user_id = interaction.user.id
+
+        if user_id in self.games:
+            await interaction.response.send_message(
+                "이미 진행 중인 게임이 있습니다. 현재 게임을 완료해주세요.",
+                ephemeral=True
+            )
+            return
+
         await self.ensure_user(user_id)
 
         # 현재 잔액 확인
