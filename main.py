@@ -20,7 +20,7 @@ class AClient(commands.Bot):
         self.cursor = self.conn.cursor()
 
     async def setup_hook(self):
-        guild = discord.Object(id=1010941336104480818)  # 여기에 당신의 서버 ID를 넣으세요
+        guild = discord.Object(id=os.getenv("GUILD_ID"))  # 여기에 당신의 서버 ID를 넣으세요
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
         # cogs 폴더 내 모든 .py 파일을 로드합니다.
