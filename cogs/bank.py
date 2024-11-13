@@ -1,13 +1,81 @@
 import datetime
+import json
 import random
 
 import discord
 from discord import app_commands
 from discord.ext import commands
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 class Bank(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.scheduler = AsyncIOScheduler()
+        self.scheduler.start()
+        self.schedule_daily_interest_notification()
+
+    def load_notification_settings(self):
+        # 파일에서 알림 설정을 불러오기
+        try:
+            with open("notification_settings.json", "r") as file:
+                data = json.load(file)
+                self.guild_id = data.get("guild_id")
+                self.channel_id = data.get("channel_id")
+                self.role_id = data.get("role_id")
+        except FileNotFoundError:
+            # 파일이 없으면 설정 초기화
+            self.guild_id = None
+            self.channel_id = None
+            self.role_id = None
+
+    def save_notification_settings(self):
+        # 알림 설정을 파일에 저장
+        with open("notification_settings.json", "w") as file:
+            json.dump({
+                "guild_id": self.guild_id,
+                "channel_id": self.channel_id,
+                "role_id": self.role_id
+            }, file)
+
+    def schedule_daily_interest_notification(self):
+        self.scheduler.add_job(self.daily_interest_notification, CronTrigger(hour=0, minute=0))
+
+    async def daily_interest_notification(self):
+        # 설정된 서버와 채널에 알림 전송
+        if self.guild_id and self.channel_id and self.role_id:
+            guild = self.bot.get_guild(self.guild_id)
+            if guild:
+                channel = guild.get_channel(self.channel_id)
+                role = guild.get_role(self.role_id)
+
+                if channel and role:
+                    await channel.send(f"{role.mention} 다음 이자를 받을 수 있는 시간이 되었습니다!")
+                else:
+                    print("채널 또는 역할을 찾을 수 없습니다.")
+            else:
+                print("서버를 찾을 수 없습니다.")
+        else:
+            print("알림 설정이 되어 있지 않습니다.")
+
+    @app_commands.command(name="알림설정", description="알림을 보낼 채널과 역할을 설정합니다.")
+    async def set_notification(self, interaction: discord.Interaction, role: discord.Role = None):
+        # 어드민 권한 확인
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("이 명령어는 관리자만 사용할 수 있습니다.", ephemeral=True)
+            return
+
+        # 현재 채널과 역할을 설정하고 저장
+        self.guild_id = interaction.guild.id
+        self.channel_id = interaction.channel.id
+        self.role_id = role.id if role else None
+        self.save_notification_settings()
+
+        if role:
+            await interaction.response.send_message(
+                f"알림이 {interaction.channel.mention} 채널과 {role.mention} 역할로 설정되었습니다.")
+        else:
+            await interaction.response.send_message(f"알림이 {interaction.channel.mention} 채널로 설정되었습니다.")
 
     async def ensure_user(self, user_id):
         self.bot.cursor.execute("SELECT * FROM users WHERE uuid = %s", (user_id,))
@@ -126,6 +194,40 @@ class Bank(commands.Cog):
             seconds = int(remaining_time % 60)
             await interaction.response.send_message(
                 f"{minutes}분 {seconds}초 후에 꽁돈을 받을 수 있습니다.")
+
+    @app_commands.command(name="이자", description="은행 이자를 받습니다.")
+    async def interest(self, interaction: discord.Interaction):
+        user_id = interaction.user.id
+
+        self.bot.cursor.execute("SELECT money, last_interest FROM users WHERE uuid = %s", (user_id,))
+        user_data = self.bot.cursor.fetchone()
+        current_balance = user_data[0]
+        last_interest = user_data[1]
+
+        if current_balance < 10000:
+            await interaction.response.send_message("이자는 잔고 10000원부터 받을 수 있습니다.")
+            return
+
+        # 마지막 이자 지급 시간 확인
+        if last_interest is None or last_interest.date() != datetime.datetime.now().date():
+            # 오늘 처음 이자를 지급하는 경우
+            new_balance = int(current_balance + current_balance * 0.075)
+            self.bot.cursor.execute("UPDATE users SET money = %s, last_interest = %s WHERE uuid = %s",
+                                    (new_balance, datetime.datetime.now(), user_id))
+            self.bot.conn.commit()
+
+            await interaction.response.send_message(
+                f"오늘 {int(current_balance * 0.075)}원의 이자를 받으셨습니다.\n현재 잔액: {new_balance}원")
+        else:
+            now = datetime.datetime.now()
+            next_midnight = (now + datetime.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+            remaining_time = next_midnight - now
+
+            hours = remaining_time.seconds // 3600
+            minutes = (remaining_time.seconds % 3600) // 60
+            seconds = remaining_time.seconds % 60
+
+            await interaction.response.send_message(f"다음 이자까지 {hours}시간 {minutes}분 {seconds}초 남았습니다.")
 
 
 async def setup(bot):
