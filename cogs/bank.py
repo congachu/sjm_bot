@@ -7,6 +7,85 @@ from discord import app_commands
 from discord.ext import commands
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from discord.ui import View, Button
+
+
+class PaginationView(View):
+    def __init__(self, bot, total_pages: int, current_page: int):
+        super().__init__(timeout=60)  # 60초 후 버튼 비활성화
+        self.bot = bot
+        self.current_page = current_page
+        self.total_pages = total_pages
+
+        # 이전 페이지 버튼
+        if current_page > 1:
+            prev_button = Button(label="이전", style=discord.ButtonStyle.primary,
+                                 custom_id=f"prev_{current_page - 1}")
+            prev_button.callback = self.prev_callback
+            self.add_item(prev_button)
+
+        # 다음 페이지 버튼
+        if current_page < total_pages:
+            next_button = Button(label="다음", style=discord.ButtonStyle.primary,
+                                 custom_id=f"next_{current_page + 1}")
+            next_button.callback = self.next_callback
+            self.add_item(next_button)
+
+    async def prev_callback(self, interaction: discord.Interaction):
+        # 이전 페이지 데이터 가져오기
+        guild_members = interaction.guild.members
+        member_ids = [member.id for member in guild_members]
+
+        self.bot.cursor.execute("SELECT uuid, money FROM users WHERE uuid IN %s ORDER BY money DESC",
+                                (tuple(member_ids),))
+        user_data = self.bot.cursor.fetchall()
+
+        page_size = 10
+        total_pages = (len(user_data) + page_size - 1) // page_size
+
+        # 새 페이지의 데이터 표시
+        start_index = (self.current_page - 2) * page_size
+        end_index = start_index + page_size
+        user_data_page = user_data[start_index:end_index]
+
+        embed = discord.Embed(title=f"이 서버의 잔고 순위 - {self.current_page - 1}/{total_pages} 페이지",
+                              color=discord.Color.blue())
+
+        for rank, (user_id, balance) in enumerate(user_data_page, start=start_index + 1):
+            user = interaction.guild.get_member(user_id)
+            username = user.name if user else f"Unknown User ({user_id})"
+            embed.add_field(name=f"{rank}. {username}", value=f"{balance:,}원", inline=False)
+
+        view = PaginationView(self.bot, total_pages, self.current_page - 1)
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    async def next_callback(self, interaction: discord.Interaction):
+        # 다음 페이지 데이터 가져오기
+        guild_members = interaction.guild.members
+        member_ids = [member.id for member in guild_members]
+
+        self.bot.cursor.execute("SELECT uuid, money FROM users WHERE uuid IN %s ORDER BY money DESC",
+                                (tuple(member_ids),))
+        user_data = self.bot.cursor.fetchall()
+
+        page_size = 10
+        total_pages = (len(user_data) + page_size - 1) // page_size
+
+        # 새 페이지의 데이터 표시
+        start_index = self.current_page * page_size
+        end_index = start_index + page_size
+        user_data_page = user_data[start_index:end_index]
+
+        embed = discord.Embed(title=f"이 서버의 잔고 순위 - {self.current_page + 1}/{total_pages} 페이지",
+                              color=discord.Color.blue())
+
+        for rank, (user_id, balance) in enumerate(user_data_page, start=start_index + 1):
+            user = interaction.guild.get_member(user_id)
+            username = user.name if user else f"Unknown User ({user_id})"
+            embed.add_field(name=f"{rank}. {username}", value=f"{balance:,}원", inline=False)
+
+        view = PaginationView(self.bot, total_pages, self.current_page + 1)
+        await interaction.response.edit_message(embed=embed, view=view)
 
 class Bank(commands.Cog):
     def __init__(self, bot):
@@ -234,38 +313,48 @@ class Bank(commands.Cog):
 
             await interaction.response.send_message(f"다음 이자까지 {hours}시간 {minutes}분 {seconds}초 남았습니다.")
 
-    @app_commands.command(name="순위", description="사용자들의 잔고 순위를 보여줍니다.")
     async def show_balance_rank(self, interaction: discord.Interaction, page: int = 1):
-        # 데이터베이스에서 사용자 정보 가져오기
-        self.bot.cursor.execute("SELECT uuid, money FROM users ORDER BY money DESC")
+        # 명령어를 호출한 서버의 멤버 목록 가져오기
+        guild_members = interaction.guild.members
+
+        # 데이터베이스에서 서버 멤버들의 정보 가져오기
+        member_ids = [member.id for member in guild_members]
+        self.bot.cursor.execute("SELECT uuid, money FROM users WHERE uuid IN %s ORDER BY money DESC",
+                              (tuple(member_ids),))
         user_data = self.bot.cursor.fetchall()
 
-        # 페이지 당 10명씩 표시
+        # 총 페이지 수 계산
         page_size = 10
+        total_pages = (len(user_data) + page_size - 1) // page_size
+
+        # 현재 페이지의 데이터 가져오기
         start_index = (page - 1) * page_size
         end_index = start_index + page_size
         user_data_page = user_data[start_index:end_index]
 
         # 임베드 메시지 생성
-        embed = discord.Embed(title=f"잔고 순위 - 페이지 {page}", color=discord.Color.blue())
+        embed = discord.Embed(title=f"이 서버의 잔고 순위 - {page}/{total_pages} 페이지", color=discord.Color.blue())
 
         for rank, (user_id, balance) in enumerate(user_data_page, start=start_index + 1):
-            # 사용자 객체 가져오기
             user = interaction.guild.get_member(user_id)
             if user:
                 username = user.name
             else:
                 username = f"Unknown User ({user_id})"
-
             embed.add_field(name=f"{rank}. {username}", value=f"{balance:,}원", inline=False)
 
-        # 이전/다음 페이지 버튼 추가
-        if page > 1:
-            embed.set_footer(text=f"이전 페이지 - 페이지 {page - 1}")
-        if end_index < len(user_data):
-            embed.set_footer(text=f"다음 페이지 - 페이지 {page + 1}")
+        # 버튼이 있는 뷰 생성
+        view = PaginationView(self.bot, total_pages, page)
 
-        await interaction.response.send_message(embed=embed)
+        # 첫 메시지인지 또는 버튼을 통한 업데이트인지 확인
+        if interaction.response.is_done():
+            await interaction.message.edit(embed=embed, view=view)
+        else:
+            await interaction.response.send_message(embed=embed, view=view)
+
+    @app_commands.command(name="순위", description="이 서버의 사용자들의 잔고 순위를 보여줍니다.")
+    async def balance_rank_command(self, interaction: discord.Interaction):
+        await self.show_balance_rank(interaction)
 
 
 async def setup(bot):
