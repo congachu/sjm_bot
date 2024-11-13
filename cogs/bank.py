@@ -98,7 +98,7 @@ class Bank(commands.Cog):
         # 사용자 잔액 조회
         self.bot.cursor.execute("SELECT money FROM users WHERE uuid = %s", (user_id,))
         user_data = self.bot.cursor.fetchone()
-        await interaction.response.send_message(f"{interaction.user.name}님의 잔액: {user_data[0]}원")
+        await interaction.response.send_message(f"{member.name}님의 잔액: {user_data[0]}원")
 
     @app_commands.command(name="보상금", description="관리자 전용 명령어입니다.")
     async def increase_money(self, interaction: discord.Interaction, amount: int, receiver: discord.Member = None):
@@ -233,6 +233,39 @@ class Bank(commands.Cog):
             seconds = remaining_time.seconds % 60
 
             await interaction.response.send_message(f"다음 이자까지 {hours}시간 {minutes}분 {seconds}초 남았습니다.")
+
+    @app_commands.command(name="순위", description="사용자들의 잔고 순위를 보여줍니다.")
+    async def show_balance_rank(self, interaction: discord.Interaction, page: int = 1):
+        # 데이터베이스에서 사용자 정보 가져오기
+        self.bot.cursor.execute("SELECT uuid, money FROM users ORDER BY money DESC")
+        user_data = self.bot.cursor.fetchall()
+
+        # 페이지 당 10명씩 표시
+        page_size = 10
+        start_index = (page - 1) * page_size
+        end_index = start_index + page_size
+        user_data_page = user_data[start_index:end_index]
+
+        # 임베드 메시지 생성
+        embed = discord.Embed(title=f"잔고 순위 - 페이지 {page}", color=discord.Color.blue())
+
+        for rank, (user_id, balance) in enumerate(user_data_page, start=start_index + 1):
+            # 사용자 객체 가져오기
+            user = interaction.guild.get_member(user_id)
+            if user:
+                username = user.name
+            else:
+                username = f"Unknown User ({user_id})"
+
+            embed.add_field(name=f"{rank}. {username}", value=f"{balance:,}원", inline=False)
+
+        # 이전/다음 페이지 버튼 추가
+        if page > 1:
+            embed.set_footer(text=f"이전 페이지 - 페이지 {page - 1}")
+        if end_index < len(user_data):
+            embed.set_footer(text=f"다음 페이지 - 페이지 {page + 1}")
+
+        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot):
