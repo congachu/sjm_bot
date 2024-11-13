@@ -90,8 +90,10 @@ class Bank(commands.Cog):
             self.bot.conn.commit()
 
     @app_commands.command(name="잔고", description="사용자의 잔액을 확인합니다.")
-    async def get_money(self, interaction: discord.Interaction):
-        user_id = interaction.user.id  # Discord 고유 사용자 ID
+    async def get_money(self, interaction: discord.Interaction, member: discord.Member = None):
+        if not member:
+            member = interaction.user
+        user_id = member.id  # Discord 고유 사용자 ID
         await self.ensure_user(user_id)  # 사용자가 없으면 자동으로 추가
         # 사용자 잔액 조회
         self.bot.cursor.execute("SELECT money FROM users WHERE uuid = %s", (user_id,))
