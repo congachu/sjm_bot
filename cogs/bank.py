@@ -1,3 +1,6 @@
+import datetime
+import random
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -94,6 +97,35 @@ class Bank(commands.Cog):
 
         await interaction.response.send_message(
             f"{interaction.user.name}님이 {receiver.name}님에게 {amount}원을 송금했습니다.")
+
+    @app_commands.command(name="꽁돈", description="1시간마다 꽁돈을 지급합니다.")
+    async def hourly_reward(self, interaction: discord.Interaction):
+        user_id = interaction.user.id
+        await self.ensure_user(user_id)
+
+        self.bot.cursor.execute("SELECT money, last_hourly FROM users WHERE uuid = %s", (user_id,))
+        user_data = self.bot.cursor.fetchone()
+        last_hourly = user_data[1]
+        current_time = datetime.datetime.now()
+
+        if not last_hourly or (current_time - last_hourly).total_seconds() >= 3600:
+            reward_amount = random.randint(1000, 5000)
+            new_balance = user_data[0] + reward_amount
+
+            # Update the user's balance and last hourly reward time in the database
+            self.bot.cursor.execute("UPDATE users SET money = %s, last_hourly = %s WHERE uuid = %s",
+                                    (new_balance, current_time, user_id))
+            self.bot.conn.commit()
+
+            await interaction.response.send_message(
+                f"{reward_amount}원을 주웠다!\n잔액: {new_balance}원")
+        else:
+            # Calculate the remaining time until the next reward
+            remaining_time = 3600 - (current_time - last_hourly).total_seconds()
+            minutes = int(remaining_time // 60)
+            seconds = int(remaining_time % 60)
+            await interaction.response.send_message(
+                f"{minutes}분 {seconds}초 후에 꽁돈을 받을 수 있습니다.")
 
 
 async def setup(bot):
