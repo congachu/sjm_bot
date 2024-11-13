@@ -49,8 +49,11 @@ class Bank(commands.Cog):
                 channel = guild.get_channel(self.channel_id)
                 role = guild.get_role(self.role_id)
 
-                if channel and role:
-                    await channel.send(f"{role.mention} 다음 이자를 받을 수 있는 시간이 되었습니다!")
+                if channel:
+                    if role:
+                        await channel.send(f"{role.mention} 다음 이자를 받을 수 있는 시간이 되었습니다!")
+                    else:
+                        await channel.send("다음 이자를 받을 수 있는 시간이 되었습니다!")
                 else:
                     print("채널 또는 역할을 찾을 수 없습니다.")
             else:
