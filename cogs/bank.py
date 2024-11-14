@@ -93,6 +93,9 @@ class Bank(commands.Cog):
         self.scheduler = AsyncIOScheduler()
         self.scheduler.start()
         self.schedule_daily_interest_notification()
+        self.guild_id = None
+        self.channel_id = None
+        self.role_id = None
 
     def load_notification_settings(self):
         # 파일에서 알림 설정을 불러오기
@@ -122,7 +125,7 @@ class Bank(commands.Cog):
 
     async def daily_interest_notification(self):
         # 설정된 서버와 채널에 알림 전송
-        if self.guild_id and self.channel_id and self.role_id:
+        if (self.guild_id and self.channel_id) or self.role_id:
             guild = self.bot.get_guild(self.guild_id)
             if guild:
                 channel = guild.get_channel(self.channel_id)
