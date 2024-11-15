@@ -93,9 +93,6 @@ class Bank(commands.Cog):
         self.scheduler = AsyncIOScheduler()
         self.scheduler.start()
         self.schedule_daily_interest_notification()
-        self.guild_id = None
-        self.channel_id = None
-        self.role_id = None
 
     def load_notification_settings(self):
         # 파일에서 알림 설정을 불러오기
@@ -142,25 +139,6 @@ class Bank(commands.Cog):
                 print("서버를 찾을 수 없습니다.")
         else:
             print("알림 설정이 되어 있지 않습니다.")
-
-    @app_commands.command(name="알림설정", description="알림을 보낼 채널과 역할을 설정합니다.")
-    async def set_notification(self, interaction: discord.Interaction, role: discord.Role = None):
-        # 어드민 권한 확인
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("이 명령어는 관리자만 사용할 수 있습니다.", ephemeral=True)
-            return
-
-        # 현재 채널과 역할을 설정하고 저장
-        self.guild_id = interaction.guild.id
-        self.channel_id = interaction.channel.id
-        self.role_id = role.id if role else None
-        self.save_notification_settings()
-
-        if role:
-            await interaction.response.send_message(
-                f"알림이 {interaction.channel.mention} 채널과 {role.mention} 역할로 설정되었습니다.")
-        else:
-            await interaction.response.send_message(f"알림이 {interaction.channel.mention} 채널로 설정되었습니다.")
 
     async def ensure_user(self, user_id):
         self.bot.cursor.execute("SELECT * FROM users WHERE uuid = %s", (user_id,))
