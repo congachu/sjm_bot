@@ -58,13 +58,13 @@ class Dice(commands.Cog):
             winnings = int(amount * 0.75)  # 추가 수익만 계산
             self.bot.cursor.execute("UPDATE users SET money = money + %s WHERE uuid = %s",
                                     (winnings, user_id))  # 추가 수익만 더함
-            result_msg = f"승리! {winnings}원을 얻었습니다."
+            result_msg = f"승리! {winnings:,}원을 얻었습니다."
         else:
             # 패배 (0배 = 전부 손실)
             loss = int(amount)  # 잃을 금액 계산
             self.bot.cursor.execute("UPDATE users SET money = money - %s WHERE uuid = %s",
                                     (loss, user_id))  # 손실금액을 뺌
-            result_msg = f"패배... {loss}원을 잃었습니다."
+            result_msg = f"패배... {loss:,}원을 잃었습니다."
 
         self.bot.conn.commit()
 
@@ -77,7 +77,7 @@ class Dice(commands.Cog):
             f"🎲 주사위: {dice}\n"
             f"선택: {'홀' if user_chose_odd else '짝'}\n"
             f"{result_msg}\n"
-            f"현재 잔액: {new_balance}원"
+            f"현재 잔액: {new_balance:,}원"
         )
 
 

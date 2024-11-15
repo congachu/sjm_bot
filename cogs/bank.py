@@ -141,7 +141,7 @@ class Bank(commands.Cog):
         # 사용자 잔액 조회
         self.bot.cursor.execute("SELECT money FROM users WHERE uuid = %s", (user_id,))
         user_data = self.bot.cursor.fetchone()
-        await interaction.response.send_message(f"{member.name}님의 잔액: {user_data[0]}원")
+        await interaction.response.send_message(f"{member.name}님의 잔액: {user_data[0]:,}원")
 
     @app_commands.command(name="보상금", description="관리자 전용 명령어입니다.")
     async def increase_money(self, interaction: discord.Interaction, amount: int, receiver: discord.Member = None):
@@ -170,9 +170,9 @@ class Bank(commands.Cog):
 
         # 메시지 출력 (receiver가 본인인지 다른 사용자인지에 따라 다른 메시지)
         if receiver_id == interaction.user.id:
-            await interaction.response.send_message(f"{interaction.user.name}님의 잔액이 {amount}원만큼 추가되었습니다.")
+            await interaction.response.send_message(f"{interaction.user.name}님의 잔액이 {amount:,}원만큼 추가되었습니다.")
         else:
-            await interaction.response.send_message(f"{receiver.name}님의 잔액이 {amount}원만큼 추가되었습니다.")
+            await interaction.response.send_message(f"{receiver.name}님의 잔액이 {amount:,}원만큼 추가되었습니다.")
 
     @app_commands.command(name="벌금", description="관리자 전용 명령어입니다.")
     async def decrease_money(self, interaction: discord.Interaction, amount: int, receiver: discord.Member = None):
@@ -201,9 +201,9 @@ class Bank(commands.Cog):
 
         # 메시지 출력 (receiver가 본인인지 다른 사용자인지에 따라 다른 메시지)
         if receiver_id == interaction.user.id:
-            await interaction.response.send_message(f"{interaction.user.name}님의 잔액이 {amount}원만큼 감소되었습니다.")
+            await interaction.response.send_message(f"{interaction.user.name}님의 잔액이 {amount:,}원만큼 감소되었습니다.")
         else:
-            await interaction.response.send_message(f"{receiver.name}님의 잔액이 {amount}원만큼 감소되었습니다.")
+            await interaction.response.send_message(f"{receiver.name}님의 잔액이 {amount:,}원만큼 감소되었습니다.")
 
     @app_commands.command(name="송금", description="다른 사용자에게 돈을 송금합니다.")
     async def send_money(self, interaction: discord.Interaction, receiver: discord.Member, amount: int):
@@ -236,7 +236,7 @@ class Bank(commands.Cog):
         self.bot.conn.commit()
 
         await interaction.response.send_message(
-            f"{interaction.user.name}님이 {receiver.name}님에게 {amount}원을 송금했습니다.")
+            f"{interaction.user.name}님이 {receiver.name}님에게 {amount:,}원을 송금했습니다.")
 
     @app_commands.command(name="꽁돈", description="1시간마다 꽁돈을 지급합니다.")
     async def hourly_reward(self, interaction: discord.Interaction):
@@ -266,7 +266,7 @@ class Bank(commands.Cog):
             self.bot.conn.commit()
 
             await interaction.response.send_message(
-                f"{reward_amount}원을 주웠다!\n잔액: {new_balance}원")
+                f"{reward_amount}원을 주웠다!\n잔액: {new_balance:,}원")
         else:
             # Calculate the remaining time until the next reward
             remaining_time = 3600 - (current_time - last_hourly).total_seconds()
@@ -305,7 +305,7 @@ class Bank(commands.Cog):
             self.bot.conn.commit()
 
             await interaction.response.send_message(
-                f"오늘 {int(current_balance * 0.075)}원의 이자를 받으셨습니다.\n현재 잔액: {new_balance}원")
+                f"오늘 {int(current_balance * 0.075):,}원의 이자를 받으셨습니다.\n현재 잔액: {new_balance:,}원")
         else:
             now = datetime.datetime.now()
             next_midnight = (now + datetime.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)

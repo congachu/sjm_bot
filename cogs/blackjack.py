@@ -167,7 +167,7 @@ class Blackjack(commands.Cog):
         await interaction.response.send_message(
             f"딜러의 패: {dealer_cards}\n"
             f"당신의 패: {player_cards} (총합: {player_total})\n"
-            f"배팅 금액: {amount}원",
+            f"배팅 금액: {amount:,}원",
             view=view
         )
 
@@ -180,7 +180,7 @@ class Blackjack(commands.Cog):
         await interaction.response.edit_message(
             content=f"딜러의 패: {dealer_cards}\n"
                     f"당신의 패: {player_cards} (총합: {player_total})\n"
-                    f"배팅 금액: {game['amount']}원"
+                    f"배팅 금액: {game['amount']:,}원"
         )
 
     async def end_game(self, interaction, user_id, reason):
@@ -221,7 +221,8 @@ class Blackjack(commands.Cog):
             else:
                 result = "무승부"
                 winnings = 0
-
+        landowner_cut = 0
+        winnings_after_cut = winnings
         if winnings > 0:
             self.bot.cursor.execute("SELECT owner_id FROM lands WHERE guild_id = %s AND channel_id = %s",
                                     (interaction.guild.id, interaction.channel_id))
@@ -260,13 +261,17 @@ class Blackjack(commands.Cog):
               f"결과: {result}\n"
 
         if winnings > 0:
-            msg += f"획득: +{winnings}원\n"
+            if landowner_cut != 0:
+                msg += f"획득: +{winnings_after_cut:,}원\n"
+                msg += f"수수료: -{landowner_cut:,}원\n"
+            else:
+                msg += f"획득: +{winnings:,}원\n"
         elif winnings < 0:
-            msg += f"손실: {winnings}원\n"
+            msg += f"손실: -{winnings:,}원\n"
         else:
             msg += "금액 변동 없음\n"
 
-        msg += f"현재 잔액: {new_balance}원"
+        msg += f"현재 잔액: {new_balance:,}원"
 
         await interaction.response.edit_message(
             content=msg,
