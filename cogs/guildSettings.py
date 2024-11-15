@@ -2,8 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-
-class Guild(commands.Cog):
+class GuildSettings(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
@@ -97,6 +96,7 @@ class Guild(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
+    # Bank 클래스에서 사용할 메서드들
     async def check_command_permission(self, interaction: discord.Interaction) -> bool:
         """명령어 사용 권한 확인"""
         self.bot.cursor.execute("""
@@ -107,11 +107,9 @@ class Guild(commands.Cog):
 
         result = self.bot.cursor.fetchone()
 
-        # 설정된 채널이 없으면 모든 채널에서 사용 가능
         if not result or not result[0]:
             return True
 
-        # 설정된 채널이면 해당 채널에서만 사용 가능
         return interaction.channel.id == result[0]
 
     async def get_notification_settings(self, guild_id: int) -> tuple:
@@ -127,5 +125,6 @@ class Guild(commands.Cog):
             return result[0], result[1]
         return None, None
 
+
 async def setup(bot):
-    await bot.add_cog(Guild(bot))
+    await bot.add_cog(GuildSettings(bot))

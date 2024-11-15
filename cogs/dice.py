@@ -23,6 +23,14 @@ class Dice(commands.Cog):
         app_commands.Choice(name="짝", value="even")
     ])
     async def binary_dice(self, interaction: discord.Interaction, amount: int, choice: str):
+        settings_cog = self.bot.get_cog('GuildSettings')
+        if not settings_cog:
+            return
+
+        if not await settings_cog.check_command_permission(interaction):
+            await interaction.response.send_message("이 채널에서는 명령어를 사용할 수 없습니다.", ephemeral=True)
+            return
+
         user_id = interaction.user.id
         await self.ensure_user(user_id)
 

@@ -77,6 +77,14 @@ class Blackjack(commands.Cog):
 
     @app_commands.command(name="블랙잭", description="블랙잭 게임을 시작합니다.\n승리시 2배, 무승부시 1배, 패배시 0배")
     async def blackjack(self, interaction: discord.Interaction, amount: int):
+        settings_cog = self.bot.get_cog('GuildSettings')
+        if not settings_cog:
+            return
+
+        if not await settings_cog.check_command_permission(interaction):
+            await interaction.response.send_message("이 채널에서는 명령어를 사용할 수 없습니다.", ephemeral=True)
+            return
+
         user_id = interaction.user.id
 
         if user_id in self.games:

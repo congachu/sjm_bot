@@ -94,51 +94,26 @@ class Bank(commands.Cog):
         self.scheduler.start()
         self.schedule_daily_interest_notification()
 
-    def load_notification_settings(self):
-        # 파일에서 알림 설정을 불러오기
-        try:
-            with open("notification_settings.json", "r") as file:
-                data = json.load(file)
-                self.guild_id = data.get("guild_id")
-                self.channel_id = data.get("channel_id")
-                self.role_id = data.get("role_id")
-        except FileNotFoundError:
-            # 파일이 없으면 설정 초기화
-            self.guild_id = None
-            self.channel_id = None
-            self.role_id = None
-
-    def save_notification_settings(self):
-        # 알림 설정을 파일에 저장
-        with open("notification_settings.json", "w") as file:
-            json.dump({
-                "guild_id": self.guild_id,
-                "channel_id": self.channel_id,
-                "role_id": self.role_id
-            }, file)
-
     def schedule_daily_interest_notification(self):
         self.scheduler.add_job(self.daily_interest_notification, CronTrigger(hour=0, minute=0))
 
     async def daily_interest_notification(self):
-        # 설정된 서버와 채널에 알림 전송
-        if (self.guild_id and self.channel_id) or self.role_id:
-            guild = self.bot.get_guild(self.guild_id)
-            if guild:
-                channel = guild.get_channel(self.channel_id)
-                role = guild.get_role(self.role_id)
+        settings_cog = self.bot.get_cog('GuildSettings')
+        if not settings_cog:
+            return
+
+        for guild in self.bot.guilds:
+            channel_id, role_id = await settings_cog.get_notification_settings(guild.id)
+
+            if channel_id:
+                channel = guild.get_channel(channel_id)
+                role = guild.get_role(role_id) if role_id else None
 
                 if channel:
                     if role:
                         await channel.send(f"{role.mention} 다음 이자를 받을 수 있는 시간이 되었습니다!")
                     else:
                         await channel.send("다음 이자를 받을 수 있는 시간이 되었습니다!")
-                else:
-                    print("채널 또는 역할을 찾을 수 없습니다.")
-            else:
-                print("서버를 찾을 수 없습니다.")
-        else:
-            print("알림 설정이 되어 있지 않습니다.")
 
     async def ensure_user(self, user_id):
         self.bot.cursor.execute("SELECT * FROM users WHERE uuid = %s", (user_id,))
@@ -151,6 +126,14 @@ class Bank(commands.Cog):
 
     @app_commands.command(name="잔고", description="사용자의 잔액을 확인합니다.")
     async def get_money(self, interaction: discord.Interaction, member: discord.Member = None):
+        settings_cog = self.bot.get_cog('GuildSettings')
+        if not settings_cog:
+            return
+
+        if not await settings_cog.check_command_permission(interaction):
+            await interaction.response.send_message("이 채널에서는 명령어를 사용할 수 없습니다.", ephemeral=True)
+            return
+
         if not member:
             member = interaction.user
         user_id = member.id  # Discord 고유 사용자 ID
@@ -162,6 +145,14 @@ class Bank(commands.Cog):
 
     @app_commands.command(name="보상금", description="관리자 전용 명령어입니다.")
     async def increase_money(self, interaction: discord.Interaction, amount: int, receiver: discord.Member = None):
+        settings_cog = self.bot.get_cog('GuildSettings')
+        if not settings_cog:
+            return
+
+        if not await settings_cog.check_command_permission(interaction):
+            await interaction.response.send_message("이 채널에서는 명령어를 사용할 수 없습니다.", ephemeral=True)
+            return
+
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("이 명령어는 관리자만 사용할 수 있습니다.", ephemeral=True)
             return
@@ -185,6 +176,14 @@ class Bank(commands.Cog):
 
     @app_commands.command(name="벌금", description="관리자 전용 명령어입니다.")
     async def decrease_money(self, interaction: discord.Interaction, amount: int, receiver: discord.Member = None):
+        settings_cog = self.bot.get_cog('GuildSettings')
+        if not settings_cog:
+            return
+
+        if not await settings_cog.check_command_permission(interaction):
+            await interaction.response.send_message("이 채널에서는 명령어를 사용할 수 없습니다.", ephemeral=True)
+            return
+
         if not interaction.user.guild_permissions.administrator:
             await interaction.response.send_message("이 명령어는 관리자만 사용할 수 있습니다.", ephemeral=True)
             return
@@ -208,6 +207,14 @@ class Bank(commands.Cog):
 
     @app_commands.command(name="송금", description="다른 사용자에게 돈을 송금합니다.")
     async def send_money(self, interaction: discord.Interaction, receiver: discord.Member, amount: int):
+        settings_cog = self.bot.get_cog('GuildSettings')
+        if not settings_cog:
+            return
+
+        if not await settings_cog.check_command_permission(interaction):
+            await interaction.response.send_message("이 채널에서는 명령어를 사용할 수 없습니다.", ephemeral=True)
+            return
+
         sender_id = interaction.user.id
         receiver_id = receiver.id
 
@@ -233,6 +240,14 @@ class Bank(commands.Cog):
 
     @app_commands.command(name="꽁돈", description="1시간마다 꽁돈을 지급합니다.")
     async def hourly_reward(self, interaction: discord.Interaction):
+        settings_cog = self.bot.get_cog('GuildSettings')
+        if not settings_cog:
+            return
+
+        if not await settings_cog.check_command_permission(interaction):
+            await interaction.response.send_message("이 채널에서는 명령어를 사용할 수 없습니다.", ephemeral=True)
+            return
+
         user_id = interaction.user.id
         await self.ensure_user(user_id)
 
@@ -262,6 +277,14 @@ class Bank(commands.Cog):
 
     @app_commands.command(name="이자", description="은행 이자를 받습니다.")
     async def interest(self, interaction: discord.Interaction):
+        settings_cog = self.bot.get_cog('GuildSettings')
+        if not settings_cog:
+            return
+
+        if not await settings_cog.check_command_permission(interaction):
+            await interaction.response.send_message("이 채널에서는 명령어를 사용할 수 없습니다.", ephemeral=True)
+            return
+
         user_id = interaction.user.id
 
         self.bot.cursor.execute("SELECT money, last_interest FROM users WHERE uuid = %s", (user_id,))
@@ -335,6 +358,14 @@ class Bank(commands.Cog):
 
     @app_commands.command(name="순위", description="이 서버의 사용자들의 잔고 순위를 보여줍니다.")
     async def balance_rank_command(self, interaction: discord.Interaction):
+        settings_cog = self.bot.get_cog('GuildSettings')
+        if not settings_cog:
+            return
+
+        if not await settings_cog.check_command_permission(interaction):
+            await interaction.response.send_message("이 채널에서는 명령어를 사용할 수 없습니다.", ephemeral=True)
+            return
+
         await self.show_balance_rank(interaction)
 
 
