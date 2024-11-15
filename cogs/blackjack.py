@@ -222,9 +222,27 @@ class Blackjack(commands.Cog):
                 result = "무승부"
                 winnings = 0
 
-        # DB 업데이트
-        self.bot.cursor.execute("UPDATE users SET money = money + %s WHERE uuid = %s",
-                                (winnings, user_id))
+        if winnings > 0:
+            self.bot.cursor.execute("SELECT owner_id FROM lands WHERE guild_id = %s", (interaction.guild.id,))
+            owner_id = self.bot.cursor.fetchone()
+            if owner_id and owner_id[0] and owner_id[0] != user_id:
+                # Deduct commission only if the user is NOT the landowner
+                landowner_cut = int(winnings * 0.02)
+                winnings_after_cut = winnings - landowner_cut
+
+                # Deduct commission from player's winnings
+                self.bot.cursor.execute("UPDATE users SET money = money + %s WHERE uuid = %s",
+                                        (winnings_after_cut, user_id))
+                # Add commission to landowner's balance
+                self.bot.cursor.execute("UPDATE users SET money = money + %s WHERE uuid = %s",
+                                        (landowner_cut, owner_id[0]))
+            else:
+                # If the user is the landowner, credit full winnings
+                self.bot.cursor.execute("UPDATE users SET money = money + %s WHERE uuid = %s", (winnings, user_id))
+        else:
+            # Loss or tie; update player's balance directly
+            self.bot.cursor.execute("UPDATE users SET money = money + %s WHERE uuid = %s", (winnings, user_id))
+
         self.bot.conn.commit()
 
         # 새로운 잔액 조회
