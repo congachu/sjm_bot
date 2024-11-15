@@ -8,7 +8,7 @@ from typing import Optional
 
 class LandView(View):
     def __init__(self, bot, channel_id: int, owner_id: Optional[int], price: int):
-        super().__init__(timeout=180)
+        super().__init__(timeout=30)
         self.bot = bot
         self.channel_id = channel_id
         self.owner_id = owner_id
@@ -18,6 +18,10 @@ class LandView(View):
         buy_button = Button(label=button_label, style=discord.ButtonStyle.green, custom_id=f"buy_{channel_id}")
         buy_button.callback = self.buy_callback
         self.add_item(buy_button)
+
+        close_button = Button(label="닫기", style=discord.ButtonStyle.red, custom_id=f"close_{channel_id}")
+        close_button.callback = self.close_callback
+        self.add_item(close_button)
 
     async def ensure_user(self, user_id):
         self.bot.cursor.execute("SELECT 1 FROM users WHERE uuid = %s", (user_id,))
@@ -30,6 +34,13 @@ class LandView(View):
         buyer_id = interaction.user.id
         await self.ensure_user(buyer_id)
 
+        self.bot.cursor.execute("SELECT owner_id FROM lands WHERE channel_id = %s", (self.channel_id,))
+        owner_data = self.bot.cursor.fetchone()
+
+        if owner_data is not None:
+            self.owner_id = owner_data[0]
+
+        print(self.owner_id, buyer_id)
         # 자기 자신의 땅은 살 수 없음
         if self.owner_id == buyer_id:
             await interaction.response.send_message("자신의 땅은 구매할 수 없습니다.", ephemeral=True)
@@ -52,6 +63,7 @@ class LandView(View):
             self.bot.cursor.execute("UPDATE users SET money = money - %s WHERE uuid = %s", (purchase_price, buyer_id))
 
             if self.owner_id:  # 이전 소유자가 있는 경우
+                await self.ensure_user(self.owner_id)
                 # 이전 소유자에게 돈 지급
                 self.bot.cursor.execute("UPDATE users SET money = money + %s WHERE uuid = %s",
                                         (purchase_price, self.owner_id))
@@ -128,6 +140,9 @@ class LandView(View):
             await interaction.response.send_message("거래 처리 중 오류가 발생했습니다.", ephemeral=True)
             raise e
 
+    async def close_callback(self, interaction: discord.Interaction):
+        await interaction.response.edit_message(content="메시지가 닫혔습니다.", embed=None, view=None)
+
 
 class Land(commands.Cog):
     def __init__(self, bot):
@@ -172,15 +187,15 @@ class Land(commands.Cog):
             await interaction.response.send_message(embed=embed, view=view)
             return
 
-        owner = interaction.guild.get_member(land_data[2])
+        owner = interaction.guild.get_member(land_data[3])
         embed = discord.Embed(
             title=f"🏞️ {target_channel.name} 땅 정보",
             description=f"소유자: {owner.mention if owner else '알 수 없음'}",
             color=discord.Color.blue()
         )
 
-        embed.add_field(name="현재 가격", value=f"{land_data[4]:,}원", inline=True)
-        embed.add_field(name="인수 가격", value=f"{int(land_data[4] * 1.2):,}원", inline=True)
+        embed.add_field(name="현재 가격", value=f"{land_data[5]:,}원", inline=True)
+        embed.add_field(name="인수 가격", value=f"{int(land_data[5] * 1.2):,}원", inline=True)
 
         purchase_date = self._convert_to_datetime(land_data[5])
         if purchase_date:
