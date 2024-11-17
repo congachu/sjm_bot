@@ -267,7 +267,7 @@ class Blackjack(commands.Cog):
             else:
                 msg += f"획득: +{winnings:,}원\n"
         elif winnings < 0:
-            msg += f"손실: -{winnings:,}원\n"
+            msg += f"손실: {winnings:,}원\n"
         else:
             msg += "금액 변동 없음\n"
 
